@@ -2,6 +2,7 @@ import flet as ft
 import os
 import sys
 import subprocess
+from pathlib import Path
 
 # Adjust system path to include the project root
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -9,6 +10,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config import load_config, save_config, CONFIG_PATH
+from storage.db import clear_previous_scan_results, init_db # Added init_db for completeness if needed by clear_previous_scan_results
 
 def main(page: ft.Page):
     page.title = "VulnViper GUI"
@@ -98,9 +100,19 @@ def main(page: ft.Page):
 
     def pick_target_directory(e: ft.FilePickerResultEvent):
         if e.path:
-            target_dir_field.value = e.path
+            selected_path = Path(e.path) # Convert to Path object
+            target_dir_field.value = str(selected_path)
             target_dir_field.update()
-            show_snackbar(f"Selected directory: {e.path}")
+
+            # Only update report name if it's still the default or empty
+            if output_file_field.value == "vulnviper_gui_report.md" or not output_file_field.value:
+                folder_name = selected_path.name
+                # Unify report name with CLI's default
+                new_report_name = f"{folder_name}_vulnviper_audit_report.md"
+                output_file_field.value = new_report_name
+                output_file_field.update()
+
+            show_snackbar(f"Selected directory: {str(selected_path)}")
 
     target_dir_picker = ft.FilePicker(on_result=pick_target_directory)
     # page.overlay.append(target_dir_picker) # This needs to be added for FilePicker to work.
@@ -113,20 +125,29 @@ def main(page: ft.Page):
 
     def run_scan_logic(e):
         if not api_key_field.value or not llm_provider_dropdown.value:
-            show_snackbar("Please configure API Key and LLM Provider first.", ft.Colors.ORANGE) # MODIFIED
+            show_snackbar("Please configure API Key and LLM Provider first.", ft.Colors.ORANGE)
             return
 
         target_dir = target_dir_field.value
         output_file = output_file_field.value
 
         if not target_dir:
-            show_snackbar("Target directory cannot be empty.", ft.Colors.RED) # MODIFIED
+            show_snackbar("Target directory cannot be empty.", ft.Colors.RED)
             return
         if not output_file:
             show_snackbar("Output file name cannot be empty.", ft.Colors.RED)
             return
         
-        scan_results_area.value = f"Starting scan for {target_dir}...\n" # MODIFIED
+        # Explicitly initialize and clear DB from GUI before calling CLI subprocess
+        try:
+            init_db() # Ensure DB is initialized before clearing
+            clear_previous_scan_results()
+            # show_snackbar("Previous scan results cleared.", ft.Colors.BLUE_GREY) # Optional feedback
+        except Exception as db_ex:
+            show_snackbar(f"Error preparing database: {db_ex}", ft.Colors.RED)
+            return
+            
+        scan_results_area.value = f"Starting scan for {target_dir}...\n"
         scan_progress_bar.visible = True
         page.update()
 

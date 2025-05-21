@@ -25,6 +25,15 @@ def init_db():
     conn.commit()
     conn.close()
 
+def clear_previous_scan_results():
+    """Deletes all records from the audit_chunks table."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM audit_chunks")
+    conn.commit()
+    conn.close()
+    # print("🧹 Previous scan results cleared from the database.") # Optional: for debugging
+
 def save_analysis(analysis: ChunkAnalysis):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()

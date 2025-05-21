@@ -8,35 +8,35 @@ from scanner.file_walker import get_target_files
 from scanner.ast_parser import parse_file_to_chunks
 from scanner.chunker import chunk_by_token_limit
 from llm.clients import audit_chunk_with_llm
-from storage.db import init_db, save_analysis
+from storage.db import init_db, save_analysis, clear_previous_scan_results
 from reporter.markdown_writer import write_markdown_report
 from storage.models import ChunkAnalysis
 import utils.logging
 
-DEFAULT_REPORT_PATH = Path.cwd() / "vulnviper_audit_report.md"
+DEFAULT_REPORT_NAME_TEMPLATE = "{folder_name}_vulnviper_audit_report.md"
 
 
 def init_command():
-    api_key = input("🔑 Enter your API key (OpenAI or Gemini): ").strip()
+    api_key = input(" Enter your API key (OpenAI or Gemini): ").strip()
     
     llm_provider = ""
     while llm_provider not in ["openai", "gemini"]:
-        llm_provider = input("🤖 Choose your LLM provider (openai/gemini): ").strip().lower()
+        llm_provider = input(" Choose your LLM provider (openai/gemini): ").strip().lower()
         if llm_provider not in ["openai", "gemini"]:
-            print("⚠️ Invalid provider. Please choose 'openai' or 'gemini'.")
+            print(" Invalid provider. Please choose 'openai' or 'gemini'.")
 
-    llm_model = input(f"⚙️ Enter model name for {llm_provider} (e.g., gpt-4o-mini, gemini-1.5-flash-latest) [optional, press Enter for default]: ").strip()
+    llm_model = input(f" Enter model name for {llm_provider} (e.g., gpt-4o-mini, gemini-1.5-flash-latest) [optional, press Enter for default]: ").strip()
     if not llm_model:
         llm_model = None
 
     save_config(api_key, llm_provider, llm_model)
 
 
-def scan_command(base_dir: str, out_path: str):
+def scan_command(base_dir: str, out_path_arg: str):
     try:
         config = load_config()
     except RuntimeError as e:
-        print(f"❌ Configuration error: {e}")
+        print(f" Configuration error: {e}")
         return
 
     api_key = config["api_key"]
@@ -44,11 +44,20 @@ def scan_command(base_dir: str, out_path: str):
     llm_model = config.get("llm_model")
 
     init_db()
+    clear_previous_scan_results()
+
     base_path = Path(base_dir).resolve()
     files = get_target_files(base_path)
 
+    if out_path_arg == str(Path.cwd() / "vulnviper_audit_report.md"):
+        scanned_folder_name = base_path.name
+        report_filename = DEFAULT_REPORT_NAME_TEMPLATE.format(folder_name=scanned_folder_name)
+        actual_out_path = Path.cwd() / report_filename
+    else:
+        actual_out_path = Path(out_path_arg)
+
     if not files:
-        print("😴 No Python files found to scan.")
+        print(" No Python files found to scan.")
         return
 
     print(f"VulnViper scanning {len(files)} file(s) using {llm_provider}{(', model: ' + llm_model) if llm_model else ''}...")
@@ -107,13 +116,13 @@ def scan_command(base_dir: str, out_path: str):
                 all_results_for_report.append(chunk_analysis_obj.to_dict())
 
     if not all_results_for_report:
-        print("🤷 No results to generate a report.")
+        print(" No results to generate a report.")
     else:
-        write_markdown_report(all_results_for_report, out_path)
-        print(f"\n✅ Audit complete. Report saved to: {out_path}")
+        write_markdown_report(all_results_for_report, actual_out_path)
+        print(f"\nAudit complete. Report saved to: {actual_out_path}")
     
     db_name = ".vulnviper.sqlite3"
-    print(f"📦 All results stored in: {Path.home() / db_name}")
+    print(f" All results stored in: {Path(db_name).resolve()}")
 
 
 def main():
@@ -126,7 +135,7 @@ def main():
     # scan command
     scan_parser = subparsers.add_parser("scan", help="Scan a directory for Python code vulnerabilities with VulnViper.")
     scan_parser.add_argument("--dir", type=str, default=".", help="Directory to scan (default: current directory).")
-    scan_parser.add_argument("--out", type=str, default=str(DEFAULT_REPORT_PATH), help=f"Output Markdown report path (default: {DEFAULT_REPORT_PATH.name}).")
+    scan_parser.add_argument("--out", type=str, default=str(Path.cwd() / "vulnviper_audit_report.md"), help=f"Output Markdown report path (default: [scanned_folder_name]_vulnviper_audit_report.md in current dir).")
 
     args = parser.parse_args()
 

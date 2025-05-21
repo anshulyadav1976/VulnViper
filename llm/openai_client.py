@@ -32,9 +32,22 @@ def analyze_chunk_openai(api_key: str, code_chunk: str, model_name: str = "gpt-4
         temperature=0
     )
     text = resp.choices[0].message.content.strip()
+    
+    # Attempt to strip markdown code fences if present
+    if text.startswith("```json\n") and text.endswith("\n```"):
+        text = text[len("```json\n"):-len("\n```")]
+    elif text.startswith("```") and text.endswith("```"):
+        # Generic fallback if ```json is not present but ``` is
+        text = text[3:-3]
+        # Further strip potential newlines if the content was on its own line
+        text = text.strip()
+
     try:
         result = json.loads(text)
-    except Exception:
-        # Fallback: return raw text on parse error
-        result = {"raw_output": text}
+    except json.JSONDecodeError as e:
+        # Fallback: return raw text and error on parse error
+        result = {
+            "error": f"LLM response could not be parsed as JSON: {e}",
+            "raw_output": text
+        }
     return result

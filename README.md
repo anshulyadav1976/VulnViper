@@ -1,152 +1,261 @@
-# 🐍 VulnViper – AI-Powered Python Security Scanner
+# VulnViper: LLM-Powered Security Scanner for Python Code
 
-**VulnViper** is a sophisticated, local-first command-line interface (CLI) tool engineered to identify security vulnerabilities within your Python codebase. By leveraging the analytical power of cutting-edge Large Language Models (LLMs) from OpenAI and Gemini, VulnViper integrates seamlessly into pre-commit workflows or manual scanning routines, empowering developers to detect and mitigate insecure code before it reaches production.
+[![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](CONTRIBUTING.md)
 
----
+**VulnViper is an intelligent security auditing tool designed to help developers identify and understand potential vulnerabilities in their Python codebases. Leveraging the power of Large Language Models (LLMs) like OpenAI\'s GPT series and Google\'s Gemini, VulnViper analyzes your code chunk by chunk, providing summaries, identifying potential security issues, and offering recommendations for mitigation.**
 
-## ✨ Core Features
+It features both a Command-Line Interface (CLI) for quick scans and automation, and a Graphical User Interface (GUI) for a more interactive experience.
 
--   🔐 **Advanced LLM-Based Security Analysis**:
-    Employs user-selected LLMs (OpenAI or Gemini) and specific models to perform deep static analysis, identifying potential security flaws in Python functions, classes, and entire files.
--   🧠 **Intelligent Code Segmentation via AST**:
-    Utilizes Python's Abstract Syntax Tree (AST) to intelligently parse and deconstruct code into meaningful logical units (functions, classes), ensuring targeted and context-aware analysis.
--   🧱 **Optimized Token-Based Chunking**:
-    Automatically splits larger code segments into LLM-manageable chunks based on token limits, preserving context and maximizing the effectiveness of the analysis without exceeding model constraints.
--   💾 **Persistent Audit Trails**:
-    Archives all audit findings, including detailed analysis and identified vulnerabilities, in a local SQLite database (`~/.vulnviper.sqlite3`), providing a comprehensive and queryable history of security assessments.
--   📄 **Comprehensive Markdown Reports**:
-    Generates clear, well-structured, and human-readable audit reports in Markdown format, summarizing identified vulnerabilities, their severity, and actionable recommendations.
--   ⚡ **Git-Aware Scanning (Planned)**:
-    Designed to prioritize staged or newly added files using `git diff` for efficient and focused scanning in active development environments (currently scans all Python files in the target directory).
+## Table of Contents
 
----
+- [Features](#features)
+- [How It Works](#how-it-works)
+  - [1. Code Discovery & Parsing](#1-code-discovery--parsing)
+  - [2. Intelligent Chunking](#2-intelligent-chunking)
+  - [3. LLM-Powered Audit](#3-llm-powered-audit)
+  - [4. Data Storage & Reporting](#4-data-storage--reporting)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+- [Usage](#usage)
+  - [Command-Line Interface (CLI)](#command-line-interface-cli)
+  - [Graphical User Interface (GUI)](#graphical-user-interface-gui)
+- [Output](#output)
+- [Contributing](#contributing)
+- [License](#license)
+- [Disclaimer](#disclaimer)
 
-## 🛠️ Installation & Setup
+## Features
 
-Ensure you have Python 3.8+ installed.
+*   **LLM-Powered Analysis:** Utilizes state-of-the-art LLMs (OpenAI GPT, Google Gemini) for deep code understanding and vulnerability detection.
+*   **Comprehensive Audits:** Identifies a range of potential security concerns, not just specific CWEs.
+*   **Actionable Recommendations:** Provides suggestions for fixing identified issues.
+*   **Code Summaries:** Generates summaries of code chunks for better understanding.
+*   **Dual Interface:**
+    *   **CLI:** For automation, integration into CI/CD pipelines, and terminal power users.
+    *   **GUI:** For an easy-to-use, visual way to configure scans and view results.
+*   **Flexible Configuration:** Choose your LLM provider and model.
+*   **Local Data Storage:** Scan results are stored locally in an SQLite database.
+*   **Markdown Reports:** Generates detailed audit reports in Markdown format.
+*   **Dynamic Report Naming:** Default report names are generated based on the scanned folder.
+*   **Progress Tracking:** Visual progress bar in the GUI and informational messages in the CLI.
+
+## How It Works
+
+VulnViper employs a multi-stage process to analyze your Python code:
+
+### 1. Code Discovery & Parsing
+
+*   **File Discovery:** VulnViper starts by walking through the specified target directory to find all Python files (`.py`).
+*   **Abstract Syntax Tree (AST) Parsing:** Each Python file is parsed into an Abstract Syntax Tree. This tree represents the grammatical structure of the code, allowing VulnViper to understand its components like functions, classes, and global statements.
+
+### 2. Intelligent Chunking
+
+*   **Logical Units:** The AST is traversed to identify logical code chunks. These chunks primarily consist of:
+    *   Function definitions
+    *   Class definitions
+    *   Global code blocks (code outside functions or classes)
+*   **Contextual Information:** For each chunk, VulnViper extracts metadata such as the file name, chunk name (e.g., function name, class name), type (e.g., `FunctionDef`, `ClassDef`), and start/end line numbers.
+*   **Token-Based Sub-Chunking:** Since LLMs have token limits for their input prompts, larger code chunks (like very long functions or entire classes) are further divided into smaller sub-chunks. This is done by carefully splitting the code while trying to maintain logical coherence, ensuring each sub-chunk sent to the LLM is within its processing capacity.
+
+### 3. LLM-Powered Audit
+
+*   **Prompt Engineering:** For each code sub-chunk, a specialized prompt is constructed. This prompt instructs the LLM to act as a security auditor and analyze the provided code for:
+    *   A brief **summary** of what the code does.
+    *   A list of potential **vulnerabilities** or security concerns.
+    *   A list of **recommendations** for mitigating these issues.
+    *   Identification of any **dependencies** or modules used (though this is a more basic extraction).
+*   **API Interaction:** The code chunk and the engineered prompt are sent to the configured LLM (OpenAI or Gemini) via their respective APIs.
+*   **Response Parsing:** The LLM\'s response, which is expected in a JSON format, is then parsed. VulnViper includes logic to handle cases where the LLM might wrap its JSON in markdown code fences and attempts to strip these before parsing. If JSON parsing fails, an error is logged along with the raw LLM output.
+
+### 4. Data Storage & Reporting
+
+*   **Local Database:** All analysis results (summaries, vulnerabilities, recommendations, file info, chunk details) are saved into a local SQLite database (`.vulnviper.sqlite3`) located in the project\'s root directory. The database is cleared at the beginning of each new scan initiated via the CLI or GUI, ensuring reports are specific to the latest scan.
+*   **Markdown Report Generation:** Once all chunks have been analyzed, VulnViper compiles the findings from the database into a comprehensive Markdown report. This report details the analysis for each chunk, making it easy to review the identified issues and suggestions. The report name is dynamically generated (e.g., `your_folder_name_vulnviper_audit_report.md`) unless a specific output path is provided by the user.
+
+## Tech Stack
+
+*   **Python:** Core language for the application.
+*   **Large Language Models:**
+    *   OpenAI API (e.g., GPT-4o-mini, GPT-3.5-turbo)
+    *   Google Gemini API
+*   **Flet:** For the Graphical User Interface (GUI), enabling a Python-native way to build web, mobile, and desktop apps.
+*   **SQLite:** For local storage of scan results.
+*   **Pathlib:** For robust and cross-platform path manipulations.
+*   **Argparse:** For parsing command-line arguments in the CLI.
+*   **Logging:** Standard Python logging module for application events and errors.
+*   **JSON:** For data interchange with LLMs.
+
+## Getting Started
+
+### Prerequisites
+
+*   **Python 3.9 or higher:** Download from [python.org](https://www.python.org/downloads/).
+*   **PIP:** Python package installer (usually comes with Python).
+*   **Git:** For cloning the repository (optional, if you download the source directly).
+*   **API Key:** An API key for either OpenAI or Google Gemini, depending on which LLM provider you intend to use.
+
+### Installation
+
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/your-username/VulnViper.git # Replace with actual repo URL
+    cd VulnViper
+    ```
+    Alternatively, download the source code ZIP and extract it.
+
+2.  **Install Dependencies:**
+    It\'s highly recommended to use a virtual environment:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\\Scripts\\activate
+    ```
+    Then, install the required packages:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+### Configuration
+
+Before you can start scanning, VulnViper needs to know your API key and preferred LLM provider.
+
+**Using the CLI `init` command (Recommended for first-time setup):**
+
+Run the following command in your terminal from the VulnViper project root:
 
 ```bash
-# Install from PyPI (once published)
-# pip install vulnviper
-
-# Or, install directly from source:
-pip install .
+python cli.py init
 ```
 
----
+This will guide you through:
+1.  Entering your API key (for OpenAI or Gemini).
+2.  Choosing your LLM provider (`openai` or `gemini`).
+3.  Optionally specifying a particular model name for the chosen provider (e.g., `gpt-4o-mini`, `gemini-1.5-flash-latest`). If you skip this, a default model will be used.
 
-## ⚙️ Configuration
+This information will be saved to a `.vulnviper_config` file in the project directory.
 
-Before performing a scan, VulnViper must be configured with your LLM provider details.
+**Using the GUI:**
 
-### Interactive Initialization
+1.  Run the GUI: `python run_gui.py`
+2.  The GUI will open, presenting fields for "API Key", "LLM Provider", and "LLM Model".
+3.  Enter your details.
+4.  Click "Save Configuration". This will create or update the `.vulnviper_config` file.
 
-Run the `init` command for a guided setup:
+**Environment Variables (Alternative):**
+
+You can also configure VulnViper using environment variables. These will override settings in the config file if both are present:
+*   `VULNVIPER_API_KEY`: Your API key.
+*   `VULNVIPER_LLM_PROVIDER`: `openai` or `gemini`.
+*   `VULNVIPER_LLM_MODEL`: (Optional) The specific model name.
+
+## Usage
+
+### Command-Line Interface (CLI)
+
+The CLI is a powerful way to run scans, especially for automation.
+
+**Basic Scan:**
+
+To scan the current directory and save the report to a dynamically named file (e.g., `current_folder_vulnviper_audit_report.md`):
 
 ```bash
-vulnviper init
+python cli.py scan
 ```
 
-This will prompt for:
-1.  **API Key**: Your secret API key for either OpenAI or Gemini.
-2.  **LLM Provider**: Choose `openai` or `gemini`.
-3.  **LLM Model (Optional)**: Specify a model (e.g., `gpt-4o-mini`, `gemini-1.5-flash-latest`). Press Enter for the default.
-
-Configuration is saved to `~/.vulnviper_config`.
-
-### Environment Variables
-
-Alternatively, configure VulnViper using environment variables (these will override the config file if set):
-
--   `VULNVIPER_API_KEY`: Your API key.
--   `VULNVIPER_LLM_PROVIDER`: `openai` or `gemini`.
--   `VULNVIPER_LLM_MODEL`: (Optional) Specific model name.
-
----
-
-## 🔬 Usage: Scanning Your Codebase
-
-To scan a Python project:
+**Scan a Specific Directory:**
 
 ```bash
-vulnviper scan --dir /path/to/your/project --out vuln_report.md
+python cli.py scan --dir /path/to/your/python_project
+```
+or for a relative path:
+```bash
+python cli.py scan --dir subfolder/my_project
 ```
 
--   `--dir <directory>`: Specifies the target directory for the scan. Defaults to the current directory (`.`).
--   `--out <filepath>`: Defines the path for the output Markdown report. Defaults to `vulnviper_audit_report.md` in the current directory.
-
-### Example Workflow
+**Specify Output Report File:**
 
 ```bash
-$ vulnviper init
-🔑 Enter your API key (OpenAI or Gemini): sk-xxxxxxxxxxxx
-🤖 Choose your LLM provider (openai/gemini): gemini
-⚙️ Enter model name for gemini (e.g., gpt-4o-mini, gemini-1.5-flash-latest) [optional, press Enter for default]: gemini-1.5-flash-latest
-✅ Configuration saved to ~/.vulnviper_config
-
-$ vulnviper scan --dir ./my_app --out my_app_security_audit.md
-🐍 VulnViper scanning 5 file(s) using gemini, model: gemini-1.5-flash-latest...
-🧠 Parsing ./my_app/auth.py
-🤖 Auditing chunk login_user (part 1/1) from auth.py
-...
-✅ Audit complete. Report saved to: my_app_security_audit.md
-📦 All results stored in: ~/.vulnviper.sqlite3
+python cli.py scan --dir /path/to/your/project --out /path/to/custom_report_name.md
 ```
 
----
+**Help:**
 
-## 🏛️ Project Architecture
+To see all available CLI options:
 
-```
-vulnviper/
-├── cli.py                   # Main CLI entry point and command handling
-├── config.py                # Configuration management (API keys, LLM preferences)
-├── scanner/
-│   ├── file_walker.py       # Discovers Python files for scanning
-│   ├── ast_parser.py        # Parses code into AST nodes (functions, classes)
-│   ├── chunker.py           # Splits code into token-limited chunks
-├── llm/
-│   ├── clients.py           # Unified interface for different LLM clients
-│   ├── openai_client.py     # Client for OpenAI API interaction
-│   ├── gemini_client.py     # Client for Gemini API interaction
-│   └── prompt_templates.py  # (Future) Centralized prompt definitions
-├── storage/
-│   ├── db.py                # SQLite database setup and operations
-│   ├── models.py            # Data models for audit results (e.g., ChunkAnalysis)
-├── reporter/
-│   ├── markdown_writer.py   # Generates Markdown reports from audit data
-│   └── pretty_print.py      # (Future) Enhanced CLI output formatting
-├── utils/
-│   ├── logging.py           # Console logging utilities
-│   └── tokenizer.py         # (Future or integrated) Token counting utilities
-├── requirements.txt         # Core Python package dependencies
-├── setup.py                 # Script for packaging and installation (setuptools)
-└── README.md                # This document: project overview and guide
+```bash
+python cli.py --help
+python cli.py scan --help
 ```
 
----
+### Graphical User Interface (GUI)
 
-## 🛠️ How VulnViper Works: A Technical Overview
+The GUI provides a user-friendly way to configure and run scans.
 
-1.  **Configuration (`vulnviper init`)**: Securely captures and stores your API key and LLM preferences (provider and model).
-2.  **File Discovery (`vulnviper scan`)**: Traverses the target directory to identify all Python (`.py`) files.
-3.  **AST-Based Parsing**: Each file is parsed into an Abstract Syntax Tree. VulnViper then extracts key code structures, primarily functions (`FunctionDef`, `AsyncFunctionDef`) and classes (`ClassDef`).
-4.  **Smart Chunking**: Code from these structures is passed to a chunker. If a code block exceeds the LLM's token processing limit, it's intelligently segmented into smaller, overlapping (if necessary for context) sub-chunks suitable for analysis.
-5.  **LLM-Powered Auditing**: Each chunk is then dispatched to the configured LLM (OpenAI or Gemini) via its respective client. A carefully crafted prompt instructs the LLM to:
-    *   Summarize the chunk's functionality.
-    *   Identify potential security vulnerabilities (e.g., injection flaws, insecure defaults, error handling issues).
-    *   Provide actionable recommendations for mitigation.
-    *   List any discernible external dependencies.
-6.  **Data Persistence**: The LLM's analysis for each chunk is structured and saved to the SQLite database (`~/.vulnviper.sqlite3`), associated with its source file and location.
-7.  **Report Generation**: Upon completion of the scan, VulnViper compiles all stored findings into a comprehensive Markdown report, offering a clear overview of the security posture of the scanned codebase.
+1.  **Run the GUI:**
+    Navigate to the VulnViper project directory in your terminal and run:
+    ```bash
+    python run_gui.py
+    ```
 
----
+2.  **Configure LLM Settings:**
+    *   If you haven\'t already, enter your API Key, select the LLM Provider, and optionally specify an LLM Model.
+    *   Click "Save Configuration".
 
-## 🤝 Contributing
+3.  **Select Target Directory:**
+    *   Click the "folder_open" icon next to the "Target Directory" field.
+    *   Browse and select the Python project directory you want to scan.
 
-Contributions are welcome! Please refer to `CONTRIBUTING.md` (to be created) for guidelines.
+4.  **Output Report File:**
+    *   The "Output Report File" field will automatically update to a name like `your_selected_folder_name_vulnviper_audit_report.md`.
+    *   You can manually change this if you prefer a different name or location.
 
-## 📜 License
+5.  **Start Scan:**
+    *   Click the "Start Scan" button.
+    *   Scan progress and any messages will appear in the "Scan Output" text area.
+    *   A progress bar will indicate scan activity.
 
-This project is licensed under the MIT License - see the `LICENSE` file (to be created) for details.
+6.  **View Report:**
+    *   Once the scan is complete, a success message will indicate where the Markdown report has been saved. You can then open and view this file.
+
+## Output
+
+VulnViper produces two main outputs:
+
+1.  **SQLite Database (`.vulnviper.sqlite3`):**
+    *   Located in the root of the VulnViper project directory.
+    *   Stores all detailed analysis results from the scan.
+    *   This database is cleared at the start of each new scan.
+
+2.  **Markdown Report (`*_vulnviper_audit_report.md`):**
+    *   A human-readable report detailing the findings for each code chunk.
+    *   Includes file and chunk information, summaries, identified vulnerabilities, and recommendations.
+    *   By default, saved in the current working directory (for CLI) or the project root (often for GUI context, though the path is relative to where `run_gui.py` is executed or where the CLI command is run from if no `--out` is used). The exact default save location depends on how the application is run and if an output path is specified.
+
+## Contributing
+
+Contributions are welcome and greatly appreciated! Whether it\'s reporting a bug, suggesting an enhancement, or submitting a pull request, your help makes VulnViper better.
+
+Please read our [CONTRIBUTING.md](CONTRIBUTING.md) guide (to be created) for details on our code of conduct and the process for submitting pull requests.
+
+**Possible areas for contribution:**
+
+*   Improving LLM prompts for more accurate or detailed analysis.
+*   Adding support for more LLM providers or models.
+*   Enhancing the GUI with more features (e.g., report viewing within the app).
+*   Improving error handling and resilience.
+*   Adding more sophisticated code parsing or chunking logic.
+*   Developing new reporting formats (e.g., HTML, JSON).
+*   Writing unit and integration tests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file (to be created) for details.
+
+## Disclaimer
+
+VulnViper is a tool to aid in security auditing and is not a replacement for manual code review by security experts. The vulnerabilities and recommendations it provides are based on the capabilities of the configured Large Language Model and may not be exhaustive or perfectly accurate. Always critically evaluate the output and use it as one part of a comprehensive security strategy. The developers of VulnViper are not responsible for any security incidents or damages arising from the use or misuse of this tool.
 
