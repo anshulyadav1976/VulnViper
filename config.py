@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 # Path to store user config
-CONFIG_PATH = Path.home() / '.vulnviper_config'
+CONFIG_PATH = Path('.vulnviper_config')
 
 def save_config(api_key: str, llm_provider: str, llm_model: str = None):
     """

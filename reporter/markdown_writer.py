@@ -7,7 +7,7 @@ def write_markdown_report(results, out_path):
     """
     lines = ["# Security Audit Report\n"]
     for r in results:
-        lines.append(f"## {r['file']} - {r['name']} ({r['type']})\n")
+        lines.append(f"## {r['file']} - {r['chunk_name']} ({r['chunk_type']})\n")
         lines.append(f"**Lines:** {r['start_line']}–{r['end_line']}\n")
         if 'summary' in r:
             lines.append(f"**Summary:** {r['summary']}\n")

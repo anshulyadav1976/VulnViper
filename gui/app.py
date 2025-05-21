@@ -84,7 +84,15 @@ def main(page: ft.Page):
     # --- Scanning Section ---
     target_dir_field = ft.TextField(label="Target Directory", value=".", width=300, read_only=True)
     output_file_field = ft.TextField(label="Output Report File", value="vulnviper_gui_report.md", width=300)
-    scan_results_area = ft.ListView(expand=True, spacing=10, auto_scroll=True)
+    scan_results_area = ft.TextField(
+        read_only=True,
+        multiline=True,
+        value="", # Initial empty value
+        expand=False, # Set to False, height will be controlled by Container
+        height=300, # Explicit height for the TextField itself within the container
+        border=ft.InputBorder.NONE, # Remove default TextField border, container will have one
+        text_size=13 # Slightly smaller text for density
+    )
     scan_progress_bar = ft.ProgressBar(width=400, visible=False)
 
 
@@ -115,12 +123,10 @@ def main(page: ft.Page):
             show_snackbar("Target directory cannot be empty.", ft.Colors.RED) # MODIFIED
             return
         if not output_file:
-            show_snackbar("Output file name cannot be empty.", ft.Colors.RED) # MODIFIED
+            show_snackbar("Output file name cannot be empty.", ft.Colors.RED)
             return
         
-        scan_results_area.controls.clear()
-        scan_results_area.controls.append(ft.Text(f"Starting scan for {target_dir}..."))
-        scan_results_area.update()
+        scan_results_area.value = f"Starting scan for {target_dir}...\n" # MODIFIED
         scan_progress_bar.visible = True
         page.update()
 
@@ -169,13 +175,15 @@ def main(page: ft.Page):
             def stream_output():
                 if process.stdout:
                     for line in iter(process.stdout.readline, ''):
-                        scan_results_area.controls.append(ft.Text(line.strip()))
+                        scan_results_area.value += line # MODIFIED (strip() and \n handled by Popen text=True and readline)
                         scan_results_area.update()
                 process.stdout.close()
                 
                 if process.stderr:
                     for line in iter(process.stderr.readline, ''):
-                        scan_results_area.controls.append(ft.Text(line.strip(), color=ft.Colors.RED)) # MODIFIED
+                        scan_results_area.value += line # MODIFIED
+                        # Potentially color this text if we could use RichText or Markdown here.
+                        # For plain TextField, we just append.
                         scan_results_area.update()
                     process.stderr.close()
                 
@@ -192,7 +200,7 @@ def main(page: ft.Page):
             page.run_thread(stream_output)
 
         except Exception as ex:
-            scan_results_area.controls.append(ft.Text(f"Error during scan: {ex}", color=ft.Colors.RED))
+            scan_results_area.value += f"Error during scan: {ex}\n" # MODIFIED
             scan_progress_bar.visible = False
             show_snackbar(f"Scan execution error: {ex}", ft.Colors.RED) # MODIFIED
             page.update()
@@ -225,13 +233,12 @@ def main(page: ft.Page):
             scan_progress_bar,
             ft.Text("Scan Output:", weight=ft.FontWeight.BOLD),
             ft.Container(
-                content=scan_results_area,
-                border=ft.border.all(1, ft.Colors.OUTLINE), # MODIFIED
+                content=scan_results_area, # scan_results_area is now a TextField
+                border=ft.border.all(1, ft.Colors.OUTLINE),
                 border_radius=5,
                 padding=10,
-                height=300, # Fixed height for the scrollable area
+                height=300, # Container height remains the same
                 width=500,
-                #expand=True # If you want it to take available space
             )
         ],
         alignment=ft.MainAxisAlignment.START,

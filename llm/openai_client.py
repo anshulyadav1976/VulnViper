@@ -1,5 +1,5 @@
 # File: vulnviper/llm/openai_client.py
-import openai
+from openai import OpenAI
 from typing import Dict
 import json
 
@@ -21,9 +21,9 @@ def analyze_chunk_openai(api_key: str, code_chunk: str, model_name: str = "gpt-4
     Sends a code chunk to the OpenAI API for security analysis.
     Returns the parsed JSON result.
     """
-    openai.api_key = api_key
+    client = OpenAI(api_key=api_key)
     prompt = PROMPT_TEMPLATE.format(code=code_chunk)
-    resp = openai.ChatCompletion.create(
+    resp = client.chat.completions.create(
         model=model_name,
         messages=[
             {"role": "system", "content": "You are an expert security auditor."},

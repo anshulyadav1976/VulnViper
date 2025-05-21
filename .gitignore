@@ -6,4 +6,8 @@ __pycache__/
 *.pyw
 *.pyz
 
+# VulnViper specific files
+.vulnviper_config
+.vulnviper.sqlite3
+
 
